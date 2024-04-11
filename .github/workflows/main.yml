@@ -1,0 +1,80 @@
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches:
+      - master # Change to the branch you want to trigger the workflow
+permissions:
+    contents: write
+env:
+  publish_folder: publish
+  solution_name: LSS
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+      
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Check Dotnet version
+        run: dotnet --info
+
+      - name: Print Current Directory
+        run: pwd
+        
+      - name: Install Dependencies
+        run: dotnet restore
+      
+      - name: print the variable
+        run: echo "publish folder = $publish_folder"
+
+      - name: create blank $publish_folder folder
+        run: mkdir "$publish_folder"
+      
+      - name: Build Blazor WASM
+        run: dotnet publish -c Release -o "$publish_folder" --nologo
+      
+      - name: Delete bin Folder
+        run: rm -rf "./$solution_name/bin"
+
+      - name: Delete obj Folder
+        run: rm -rf "./$solution_name/obj"
+
+      - name: Delete project Folder
+        run: rm -rf ./$solution_name
+        
+      - name: List all subfolder
+        run: find . -type d -not -type l -not -path './.git*'
+      
+      - name: List all files
+        run: find . -type f -not -path './.git*'
+
+      - name: change the base tag in index.html from '/' to match Github pages repository subdirectory
+        run: sed -i 's/<base href="\/" \/>/<base href="\/LSS\/" \/>/g' "./$publish_folder/wwwroot/index.html"
+
+      - name: Copy index.html to 404.html
+        run: cp ./$publish_folder/wwwroot/index.html "./$publish_folder/wwwroot/404.html"
+
+      # add .nojekyll file to tell GitHub pages to not treat this as a Jekyll project. 
+      # (Allow files and folders starting with an underscore)
+      - name: Add .nojekyll file
+        run: touch "./$publish_folder/wwwroot/.nojekyll"
+
+      # - name: add attribute file
+      #   run: touch ./LifestyleStudioWebApp.GithubPages/wwwroot/.gitattributes
+        
+      # - name: add binary into attribute file
+      #   run: echo -e "* binary" > ./LifestyleStudioWebApp.GithubPages/wwwroot/.gitattributes
+        
+      - name: Publish to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@4.1.3
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: gh-pages 
+          FOLDER: publish/wwwroot
+          CLEAN: true
+
